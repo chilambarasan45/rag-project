@@ -6,8 +6,9 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.llms import Ollama
 
-
+from transformers import pipeline
 
 
 # Load PDF
@@ -39,3 +40,34 @@ embeddings = HuggingFaceEmbeddings(
 vectorstore = FAISS.from_documents(chunks, embeddings)
 
 print("\nVector DB created successfully")
+query = input("\nEnter your question: ")
+
+retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
+
+docs = retriever.invoke(query)
+
+print("\nRetrieved Chunks:\n")
+
+for i, doc in enumerate(docs):
+    print(f"\nChunk {i+1}:")
+    print(doc.page_content)
+
+generator = pipeline("text-generation", model="google/flan-t5-base")
+
+
+context = "\n\n".join([doc.page_content for doc in docs])
+
+prompt = f"""
+Answer the question based on the context below.
+
+Context:
+{context}
+
+Question:
+{query}
+"""
+
+response = generator(prompt, max_length=200)
+
+print("\nFinal Answer:\n")
+print(response[0]['generated_text'])
