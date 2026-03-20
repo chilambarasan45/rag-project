@@ -10,7 +10,7 @@ from langchain_community.llms import Ollama
 
 from transformers import pipeline
 
-
+from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 # Load PDF
 loader = PyPDFLoader("data/sample.pdf")
 documents = loader.load()
@@ -40,20 +40,34 @@ embeddings = HuggingFaceEmbeddings(
 vectorstore = FAISS.from_documents(chunks, embeddings)
 
 print("\nVector DB created successfully")
+# Get query
 query = input("\nEnter your question: ")
 
-retriever = vectorstore.as_retriever(search_kwargs={"k": 2})
+retriever = vectorstore.as_retriever(search_kwargs={"k": 6})
+
 
 docs = retriever.invoke(query)
+docs = sorted(docs, key=lambda x: len(x.page_content), reverse=True)
+
 
 print("\nRetrieved Chunks:\n")
-
 for i, doc in enumerate(docs):
     print(f"\nChunk {i+1}:")
     print(doc.page_content)
 
-generator = pipeline("text-generation", model="google/flan-t5-base")
+# Build context AFTER retrieval
+context = "\n\n".join([
+    doc.page_content for doc in docs
+    if "sample-files.com" not in doc.page_content.lower()
+    and "ut nec" not in doc.page_content.lower()
+    and len(doc.page_content.strip()) > 100
+])
 
+
+
+
+# Final prompt
+llm = Ollama(model="llama3")
 
 context = "\n\n".join([doc.page_content for doc in docs])
 
@@ -67,7 +81,11 @@ Question:
 {query}
 """
 
-response = generator(prompt, max_length=200)
+response = llm.invoke(prompt)
 
 print("\nFinal Answer:\n")
-print(response[0]['generated_text'])
+print(response)
+
+
+
+
