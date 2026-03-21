@@ -41,14 +41,11 @@ vectorstore = FAISS.from_documents(chunks, embeddings)
 
 print("\nVector DB created successfully")
 # Get query
+# Get query
 query = input("\nEnter your question: ")
 
-retriever = vectorstore.as_retriever(search_kwargs={"k": 6})
-
-
+retriever = vectorstore.as_retriever(search_kwargs={"k": 1})
 docs = retriever.invoke(query)
-docs = sorted(docs, key=lambda x: len(x.page_content), reverse=True)
-
 
 print("\nRetrieved Chunks:\n")
 for i, doc in enumerate(docs):
@@ -56,21 +53,9 @@ for i, doc in enumerate(docs):
     print(doc.page_content)
 
 # Build context AFTER retrieval
-context = "\n\n".join([
-    doc.page_content for doc in docs
-    if "sample-files.com" not in doc.page_content.lower()
-    and "ut nec" not in doc.page_content.lower()
-    and len(doc.page_content.strip()) > 100
-])
-
-
-
-
-# Final prompt
-llm = Ollama(model="llama3")
-
 context = "\n\n".join([doc.page_content for doc in docs])
 
+# Final prompt
 prompt = f"""
 Answer the question based on the context below.
 
@@ -81,11 +66,14 @@ Question:
 {query}
 """
 
-response = llm.invoke(prompt)
+# Load model
+tokenizer = AutoTokenizer.from_pretrained("google/flan-t5-base")
+model = AutoModelForSeq2SeqLM.from_pretrained("google/flan-t5-base")
+
+inputs = tokenizer(prompt, return_tensors="pt", truncation=True)
+outputs = model.generate(**inputs, max_new_tokens=150)
+
+answer = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
 print("\nFinal Answer:\n")
-print(response)
-
-
-
-
+print(answer)
